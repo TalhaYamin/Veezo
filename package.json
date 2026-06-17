@@ -8,7 +8,6 @@
     "install:all": "npm --prefix frontend install && npm --prefix backend install"
   },
   "workspaces": [
-    "frontend",
-    "backend"
+    "frontend"
   ]
 }

@@ -38,4 +38,27 @@ MONGO_URI=mongodb://127.0.0.1:27017/veezo
 ```
 
 Orders use cash on delivery — customers pay when the order is delivered. No payment gateway keys are required.
-# Veezo
+
+## Deploy backend (Render)
+
+The backend is a plain Express app — **no build step**.
+
+| Render setting | Value |
+|----------------|--------|
+| Root Directory | `backend` |
+| Build Command | `npm install` |
+| Start Command | `node server.js` |
+
+Do **not** use `npm run build` for the backend.
+
+Environment variables: `MONGO_URI`, `FRONTEND_URL`, `ADMIN_PASSWORD`, `ADMIN_TOKEN`
+
+## Deploy frontend (Vercel)
+
+| Vercel setting | Value |
+|----------------|--------|
+| Root Directory | `frontend` |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+Environment variable: `VITE_API_URL=https://your-api.onrender.com/api`
