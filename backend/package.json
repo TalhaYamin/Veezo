@@ -2,7 +2,11 @@
   "name": "veezo-backend",
   "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "build": "node -e \"console.log('Backend has no compile step')\"",
     "dev": "node server.js",
     "start": "node server.js",
     "seed": "node -e \"require('dotenv').config(); const {connectDB}=require('./db/connection'); const {seedDatabase}=require('./db/seed'); connectDB().then(seedDatabase).then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})\"",
