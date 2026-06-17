@@ -1,0 +1,93 @@
+[
+  {
+    "id": "test-1781532313451",
+    "name": "test",
+    "category": "Outerwear",
+    "price": 100,
+    "stock": 10,
+    "status": "Active",
+    "badge": "New",
+    "description": "test",
+    "image": "/uploads/1781532313450-186417082.png",
+    "sizes": [],
+    "featured": false
+  },
+  {
+    "id": "upload-test-1781514250067",
+    "name": "Upload Test",
+    "category": "General",
+    "price": 99,
+    "stock": 5,
+    "status": "Active",
+    "badge": "New",
+    "description": "Stored via upload",
+    "image": "/uploads/1781514250037-805275396.png",
+    "sizes": [],
+    "featured": false
+  },
+  {
+    "id": "live-upload-check-1781512525843",
+    "name": "Live Upload Check",
+    "category": "Verified",
+    "price": 109,
+    "stock": 5,
+    "status": "Active",
+    "badge": "New",
+    "description": "Backend upload verification",
+    "image": "/uploads/1781512525837-962620753.png",
+    "sizes": [],
+    "featured": false
+  },
+  {
+    "id": "atelier-coat",
+    "name": "Atelier Coat",
+    "category": "Outerwear",
+    "price": 420,
+    "oldPrice": 520,
+    "stock": 12,
+    "status": "New Arrival",
+    "badge": "New drop",
+    "description": "Structured wool tailoring with a sharp lapel and refined gold-toned accents.",
+    "image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80",
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L"
+    ],
+    "featured": true
+  },
+  {
+    "id": "signature-knit",
+    "name": "Signature Knit",
+    "category": "Knitwear",
+    "price": 180,
+    "stock": 28,
+    "status": "Best Seller",
+    "badge": "Best seller",
+    "description": "A softly structured knit designed for evening layering and day-to-night polish.",
+    "image": "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?auto=format&fit=crop&w=900&q=80",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "featured": true
+  },
+  {
+    "id": "luna-bag",
+    "name": "Luna Bag",
+    "category": "Accessories",
+    "price": 260,
+    "oldPrice": 320,
+    "stock": 7,
+    "status": "Limited",
+    "badge": "Limited",
+    "description": "Minimal silhouette, sculpted handles, and premium hardware for effortless luxury.",
+    "image": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
+    "sizes": [
+      "One size"
+    ],
+    "featured": false
+  }
+]
