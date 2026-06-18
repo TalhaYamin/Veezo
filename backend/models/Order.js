@@ -17,7 +17,11 @@ const orderSchema = new mongoose.Schema(
     sessionId: { type: String, required: true, unique: true },
     items: { type: [orderItemSchema], default: [] },
     total: { type: Number, required: true, min: 0 },
-    status: { type: String, enum: ['pending', 'delivered', 'cancelled'], default: 'pending' },
+    status: {
+      type: String,
+      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'pending',
+    },
     paymentMethod: { type: String, enum: ['cod'], default: 'cod' },
     customerEmail: { type: String, default: '' },
     customerName: { type: String, default: '' },

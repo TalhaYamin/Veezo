@@ -3,7 +3,10 @@ const mongoose = require('mongoose');
 const Category = require('../models/Category');
 const Collection = require('../models/Collection');
 const Product = require('../models/Product');
+const Inquiry = require('../models/Inquiry');
+const NewsletterSubscriber = require('../models/NewsletterSubscriber');
 const { toProductJSON, toCategoryJSON, toCollectionJSON } = require('../utils/serialize');
+const { getSiteSettings, toPublicSettings } = require('../lib/settings');
 
 const router = express.Router();
 
@@ -128,6 +131,47 @@ router.get('/products/:id', async (req, res) => {
     const product = await Product.findOne(query).populate('categoryId').populate('collectionId');
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(toProductJSON(product));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/settings', async (_req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    res.json(toPublicSettings(settings));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/contact', async (req, res) => {
+  try {
+    const { name, email, subject = '', message } = req.body || {};
+    if (!name?.trim() || !email?.trim() || !message?.trim()) {
+      return res.status(400).json({ message: 'Name, email, and message are required.' });
+    }
+    const inquiry = await Inquiry.create({
+      name: name.trim(),
+      email: email.trim(),
+      subject: String(subject).trim(),
+      message: message.trim(),
+    });
+    res.status(201).json({ ok: true, id: inquiry._id.toString() });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/newsletter', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email?.trim()) return res.status(400).json({ message: 'Email is required.' });
+    const normalized = email.trim().toLowerCase();
+    const existing = await NewsletterSubscriber.findOne({ email: normalized });
+    if (existing) return res.json({ ok: true, message: 'Already subscribed.' });
+    await NewsletterSubscriber.create({ email: normalized });
+    res.status(201).json({ ok: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

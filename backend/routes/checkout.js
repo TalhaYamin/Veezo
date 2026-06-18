@@ -73,7 +73,11 @@ router.get('/order/:orderId', async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    const confirmed = order.status === 'pending' || order.status === 'delivered';
+    const confirmed =
+      order.status === 'pending' ||
+      order.status === 'processing' ||
+      order.status === 'shipped' ||
+      order.status === 'delivered';
 
     return res.json({
       ok: true,

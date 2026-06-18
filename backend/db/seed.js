@@ -4,6 +4,7 @@ const Category = require('../models/Category');
 const Collection = require('../models/Collection');
 const Product = require('../models/Product');
 const { slugify } = require('../utils/slug');
+const { getSiteSettings } = require('../lib/settings');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -215,6 +216,7 @@ async function seedDatabase() {
   }
 
   console.log(`Seeded ${productsToSeed.length} products`);
+  await getSiteSettings();
 }
 
 module.exports = { seedDatabase };

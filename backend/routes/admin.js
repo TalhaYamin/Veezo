@@ -4,7 +4,10 @@ const Category = require('../models/Category');
 const Collection = require('../models/Collection');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const Inquiry = require('../models/Inquiry');
+const NewsletterSubscriber = require('../models/NewsletterSubscriber');
 const { requireAdmin, ADMIN_PASSWORD, ADMIN_TOKEN } = require('../middleware/auth');
+const { getSiteSettings, toPublicSettings } = require('../lib/settings');
 const { upload } = require('../middleware/upload');
 const { toProductJSON, toCategoryJSON, toCollectionJSON } = require('../utils/serialize');
 const { slugify } = require('../utils/slug');
@@ -58,19 +61,86 @@ router.post('/login', (req, res) => {
   return res.status(401).json({ message: 'Invalid admin password.' });
 });
 
+function toOrderJSON(order) {
+  return {
+    id: order.sessionId,
+    sessionId: order.sessionId,
+    total: order.total,
+    status: order.status,
+    paymentMethod: order.paymentMethod,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    customerPhone: order.customerPhone,
+    shippingAddress: order.shippingAddress,
+    items: order.items,
+    createdAt: order.createdAt,
+  };
+}
+
+function inventoryBucket(product) {
+  if (product.stock === 0) return 'soldOut';
+  if (product.stock < 10) return 'lowStock';
+  if (product.status === 'New Arrival') return 'newArrival';
+  if (product.status === 'Limited') return 'restocking';
+  if (String(product.badge || '').toLowerCase().includes('pre')) return 'preorder';
+  return 'inStock';
+}
+
 router.get('/dashboard', requireAdmin, async (_req, res) => {
   try {
-    const [totalProducts, categories, collections, orders, lowStock] = await Promise.all([
-      Product.countDocuments(),
-      Category.countDocuments(),
-      Collection.countDocuments(),
-      Order.countDocuments(),
-      Product.countDocuments({ stock: { $lt: 10 } }),
-    ]);
+    const [products, totalProducts, categories, collections, orders, newsletterCount, recentOrders] =
+      await Promise.all([
+        Product.find().select('name stock status badge'),
+        Product.countDocuments(),
+        Category.countDocuments(),
+        Collection.countDocuments(),
+        Order.countDocuments(),
+        NewsletterSubscriber.countDocuments(),
+        Order.find().sort({ createdAt: -1 }).limit(5),
+      ]);
+
     const totalStockAgg = await Product.aggregate([{ $group: { _id: null, total: { $sum: '$stock' } } }]);
     const totalStock = totalStockAgg[0]?.total || 0;
+    const revenueAgg = await Order.aggregate([
+      { $match: { status: { $nin: ['cancelled'] } } },
+      { $group: { _id: null, total: { $sum: '$total' } } },
+    ]);
+    const totalRevenue = revenueAgg[0]?.total || 0;
 
-    res.json({ totalProducts, totalStock, lowStock, categories, collections, orders });
+    const inventoryStatus = {
+      inStock: 0,
+      lowStock: 0,
+      soldOut: 0,
+      restocking: 0,
+      preorder: 0,
+      newArrival: 0,
+    };
+    const inventoryAlerts = [];
+
+    for (const product of products) {
+      const bucket = inventoryBucket(product);
+      inventoryStatus[bucket] += 1;
+      if (product.stock === 0) {
+        inventoryAlerts.push({ name: product.name, stock: product.stock, type: 'soldOut' });
+      } else if (product.stock < 10) {
+        inventoryAlerts.push({ name: product.name, stock: product.stock, type: 'lowStock' });
+      }
+    }
+
+    res.json({
+      totalProducts,
+      totalStock,
+      lowStock: inventoryStatus.lowStock,
+      categories,
+      collections,
+      orders,
+      totalRevenue,
+      totalOrders: orders,
+      newsletterCount,
+      inventoryStatus,
+      inventoryAlerts: inventoryAlerts.slice(0, 5),
+      recentOrders: recentOrders.map(toOrderJSON),
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -343,7 +413,154 @@ router.delete('/products/:id', requireAdmin, async (req, res) => {
 router.get('/orders', requireAdmin, async (_req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 }).limit(100);
-    res.json(orders);
+    res.json(orders.map(toOrderJSON));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.patch('/orders/:orderId', requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    const allowed = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: 'Invalid order status.' });
+    }
+    const order = await Order.findOneAndUpdate(
+      { sessionId: req.params.orderId },
+      { status },
+      { new: true }
+    );
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json(toOrderJSON(order));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/customers', requireAdmin, async (_req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    const map = new Map();
+
+    for (const order of orders) {
+      const key = order.customerEmail || order.customerPhone || order.customerName || order.sessionId;
+      const existing = map.get(key) || {
+        id: key,
+        name: order.customerName || 'Guest',
+        email: order.customerEmail || '',
+        phone: order.customerPhone || '',
+        orders: 0,
+        totalSpent: 0,
+        lastOrderAt: order.createdAt,
+      };
+      existing.orders += 1;
+      if (order.status !== 'cancelled') existing.totalSpent += order.total;
+      if (order.createdAt > existing.lastOrderAt) existing.lastOrderAt = order.createdAt;
+      if (!existing.name && order.customerName) existing.name = order.customerName;
+      map.set(key, existing);
+    }
+
+    res.json(Array.from(map.values()).sort((a, b) => new Date(b.lastOrderAt) - new Date(a.lastOrderAt)));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/inventory', requireAdmin, async (_req, res) => {
+  try {
+    const products = await Product.find().populate('collectionId').populate('categoryId').sort({ stock: 1 });
+    res.json(
+      products.map((product) => ({
+        ...toProductJSON(product),
+        inventoryStatus: inventoryBucket(product),
+      }))
+    );
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/inquiries', requireAdmin, async (_req, res) => {
+  try {
+    const inquiries = await Inquiry.find().sort({ createdAt: -1 }).limit(100);
+    res.json(
+      inquiries.map((item) => ({
+        id: item._id.toString(),
+        name: item.name,
+        email: item.email,
+        subject: item.subject,
+        message: item.message,
+        createdAt: item.createdAt,
+      }))
+    );
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/inquiries/:id', requireAdmin, async (req, res) => {
+  try {
+    await Inquiry.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/newsletter', requireAdmin, async (_req, res) => {
+  try {
+    const subscribers = await NewsletterSubscriber.find().sort({ createdAt: -1 }).limit(200);
+    res.json(subscribers.map((s) => ({ email: s.email, createdAt: s.createdAt })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/newsletter/:email', requireAdmin, async (req, res) => {
+  try {
+    await NewsletterSubscriber.findOneAndDelete({ email: req.params.email.toLowerCase() });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/settings', requireAdmin, async (_req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    res.json(toPublicSettings(settings));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    const { storeName, shippingCost, freeShippingThreshold, whatsappNumber, footer } = req.body || {};
+    if (storeName !== undefined) settings.storeName = storeName;
+    if (shippingCost !== undefined) settings.shippingCost = Number(shippingCost);
+    if (freeShippingThreshold !== undefined) settings.freeShippingThreshold = Number(freeShippingThreshold);
+    if (whatsappNumber !== undefined) settings.whatsappNumber = whatsappNumber;
+    if (footer) settings.footer = { ...settings.footer.toObject?.() || settings.footer, ...footer };
+    await settings.save();
+    res.json(toPublicSettings(settings));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/settings/password', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+    res.json({
+      ok: true,
+      message: 'Update ADMIN_PASSWORD in your server environment variables and redeploy to apply.',
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
