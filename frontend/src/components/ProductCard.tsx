@@ -1,19 +1,20 @@
 import { Link } from 'react-router-dom';
 import type { Product } from '../types';
+import { formatPrice } from '../lib/currency';
 import { imageUrl } from '../lib/images';
 
 export default function ProductCard({ product }: { product: Product }) {
   const outOfStock = product.stock <= 0;
 
   return (
-    <article className="group overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-xl shadow-black/40 backdrop-blur-xl transition hover:border-amber-400/30">
+    <article className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-xl shadow-black/40 backdrop-blur-xl hover:border-amber-400/30">
       <Link to={`/product/${product.id}`} className="block">
         <div className="relative aspect-[4/5] overflow-hidden bg-zinc-900">
           {product.image ? (
             <img
               src={imageUrl(product.image)}
               alt={product.name}
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              className="h-full w-full object-cover"
               loading="lazy"
             />
           ) : (
@@ -40,8 +41,8 @@ export default function ProductCard({ product }: { product: Product }) {
           <p className="mt-2 line-clamp-2 text-sm text-zinc-400">{product.description}</p>
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-end gap-2">
-              <span className="text-lg font-semibold text-amber-100">${product.price}</span>
-              {product.oldPrice ? <span className="text-sm text-zinc-500 line-through">${product.oldPrice}</span> : null}
+              <span className="text-lg font-semibold text-amber-100">{formatPrice(product.price)}</span>
+              {product.oldPrice ? <span className="text-sm text-zinc-500 line-through">{formatPrice(product.oldPrice)}</span> : null}
             </div>
             <span className="text-xs text-zinc-500">{outOfStock ? 'Unavailable' : `${product.stock} in stock`}</span>
           </div>

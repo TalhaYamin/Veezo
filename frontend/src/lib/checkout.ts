@@ -16,6 +16,8 @@ export type OrderVerifyResponse = {
   paymentMethod: 'cod';
   order: {
     sessionId: string;
+    subtotal?: number;
+    deliveryCharge?: number;
     total: number;
     status: string;
     items: Array<{ name: string; price: number; quantity: number }>;

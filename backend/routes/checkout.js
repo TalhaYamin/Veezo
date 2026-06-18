@@ -2,6 +2,8 @@ const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { placeCodOrder } = require('../lib/orders');
+const { getSiteSettings } = require('../lib/settings');
+const { calculateDeliveryCharge, calculateOrderTotal } = require('../lib/delivery');
 
 const router = express.Router();
 
@@ -34,13 +36,18 @@ router.post('/place-order', async (req, res) => {
       }
     }
 
-    const amount = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+    const subtotal = items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+    const settings = await getSiteSettings();
+    const deliveryCharge = calculateDeliveryCharge(subtotal, settings);
+    const amount = calculateOrderTotal(subtotal, settings);
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
     const orderId = `cod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const order = await Order.create({
       sessionId: orderId,
       items,
+      subtotal,
+      deliveryCharge,
       total: amount,
       status: 'pending',
       paymentMethod: 'cod',
@@ -85,6 +92,8 @@ router.get('/order/:orderId', async (req, res) => {
       paymentMethod: order.paymentMethod || 'cod',
       order: {
         sessionId: order.sessionId,
+        subtotal: order.subtotal ?? order.total,
+        deliveryCharge: order.deliveryCharge ?? 0,
         total: order.total,
         status: order.status,
         items: order.items,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { apiRequest } from '../lib/api';
+import { contactInfoFromSettings } from '../lib/contactInfo';
 import type { SiteSettings } from '../types/admin';
 
 export default function ContactPage() {
@@ -12,6 +13,8 @@ export default function ContactPage() {
   useEffect(() => {
     apiRequest<SiteSettings>('/settings').then(setSettings).catch(() => null);
   }, []);
+
+  const contact = contactInfoFromSettings(settings || undefined);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -34,18 +37,24 @@ export default function ContactPage() {
         <section className="rounded-[32px] border border-white/10 bg-white/5 p-8">
           <p className="text-xs uppercase tracking-[0.35em] text-amber-200">Contact</p>
           <h1 className="mt-4 text-3xl font-semibold text-white">We are here to help</h1>
-          <p className="mt-4 text-zinc-300">For private appointments, wholesale inquiries, or product support, reach our concierge team.</p>
+          <p className="mt-4 text-zinc-300">For orders, product support, or general inquiries, reach our team directly.</p>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="mt-8 grid gap-6 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
               <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">Email</p>
-              <a href={`mailto:${settings?.footer.contactInfo.email || 'concierge@veezo.com'}`} className="mt-2 block text-amber-200">
-                {settings?.footer.contactInfo.email || 'concierge@veezo.com'}
+              <a href={`mailto:${contact.email}`} className="mt-2 block text-amber-200 hover:text-white">
+                {contact.email}
               </a>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
               <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">Phone</p>
-              <p className="mt-2 text-zinc-300">{settings?.footer.contactInfo.phone || 'Mon–Sat, 10am–7pm'}</p>
+              <a href={`tel:${contact.phone.replace(/\s/g, '')}`} className="mt-2 block text-zinc-300 hover:text-amber-200">
+                {contact.phone}
+              </a>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+              <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">Address</p>
+              <p className="mt-2 text-zinc-300">{contact.address}</p>
             </div>
           </div>
 

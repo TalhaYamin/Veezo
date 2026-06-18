@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiFormRequest, apiRequest } from '../../lib/api';
-import { imageUrl } from '../../lib/images';
+import { formatPrice } from '../../lib/currency';
+import { imageUrl, MAX_IMAGE_LABEL, validateImageFiles } from '../../lib/images';
 import type { Category, Product } from '../../types';
 
 type ProductForm = {
@@ -43,6 +44,17 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<Product['images']>([]);
 
+  const newImagePreviews = useMemo(
+    () => imageFiles.map((file) => URL.createObjectURL(file)),
+    [imageFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [newImagePreviews]);
+
   const resetProductForm = () => {
     setEditingProductId(null);
     setForm(emptyForm);
@@ -68,6 +80,15 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
     setImageFiles([]);
   };
 
+  const handleImageSelection = (files: File[]) => {
+    const error = validateImageFiles(files);
+    if (error) {
+      onError(error);
+      return;
+    }
+    setImageFiles(files);
+  };
+
   const saveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.collectionId) return onError('Select a collection for this product.');
@@ -85,7 +106,7 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
     data.append('featured', String(form.featured));
     data.append('collectionId', form.collectionId);
     imageFiles.forEach((file) => data.append('imageFiles', file));
-    if (editingProductId && existingImages.length) data.append('images', JSON.stringify(existingImages));
+    if (editingProductId) data.append('images', JSON.stringify(existingImages));
 
     try {
       if (editingProductId) {
@@ -130,8 +151,8 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
               ))
             )}
           </select>
-          <input required type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Price" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
-          <input type="number" min="0" step="0.01" value={form.oldPrice} onChange={(e) => setForm({ ...form, oldPrice: e.target.value })} placeholder="Old price" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
+          <input required type="number" min="0" step="1" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Price (PKR)" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
+          <input type="number" min="0" step="1" value={form.oldPrice} onChange={(e) => setForm({ ...form, oldPrice: e.target.value })} placeholder="Old price (PKR)" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
           <input required type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="Stock" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
           <input value={form.sizes} onChange={(e) => setForm({ ...form, sizes: e.target.value })} placeholder="Sizes" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
           <input value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} placeholder="Badge" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
@@ -146,13 +167,36 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
           <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} />
           Featured on homepage
         </label>
-        <input type="file" accept="image/*" multiple onChange={(e) => setImageFiles(Array.from(e.target.files || []))} className="mt-4 w-full text-sm text-zinc-400" />
-        {existingImages.length ? (
+        <div className="mt-4">
+          <label className="block text-sm text-zinc-400">
+            Product images (max {MAX_IMAGE_LABEL} each)
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => handleImageSelection(Array.from(e.target.files || []))}
+              className="mt-2 w-full text-sm text-zinc-400"
+            />
+          </label>
+        </div>
+        {(existingImages.length > 0 || newImagePreviews.length > 0) ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {existingImages.map((img, index) => (
-              <div key={`${img.url}-${index}`} className="relative">
+              <div key={`${img.url.slice(0, 32)}-${index}`} className="relative">
                 <img src={imageUrl(img.url)} alt="" className="h-20 w-20 rounded-lg object-cover" />
                 <button type="button" onClick={() => setExistingImages((prev) => prev.filter((_, i) => i !== index))} className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 text-xs text-white">×</button>
+              </div>
+            ))}
+            {newImagePreviews.map((preview, index) => (
+              <div key={preview} className="relative">
+                <img src={preview} alt="" className="h-20 w-20 rounded-lg object-cover ring-2 ring-amber-400/50" />
+                <button
+                  type="button"
+                  onClick={() => setImageFiles((prev) => prev.filter((_, i) => i !== index))}
+                  className="absolute -right-1 -top-1 rounded-full bg-red-500 px-1.5 text-xs text-white"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
@@ -169,7 +213,7 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
             <tr>
               <th className="py-2 pr-4">Product</th>
               <th className="py-2 pr-4">Category</th>
-              <th className="py-2 pr-4">Price</th>
+              <th className="py-2 pr-4">Price (PKR)</th>
               <th className="py-2 pr-4">Stock</th>
               <th className="py-2 pr-4">Status</th>
               <th className="py-2">Actions</th>
@@ -185,7 +229,7 @@ export default function AdminProducts({ categories, products, onRefresh, onNotif
                   </div>
                 </td>
                 <td className="py-3 pr-4">{product.category?.name || '—'}</td>
-                <td className="py-3 pr-4">${product.price}</td>
+                <td className="py-3 pr-4">{formatPrice(product.price)}</td>
                 <td className="py-3 pr-4">{product.stock}</td>
                 <td className="py-3 pr-4">{product.status}</td>
                 <td className="py-3">

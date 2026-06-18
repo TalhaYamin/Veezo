@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import Logo from './Logo';
 import { useCartStore } from '../store/cart';
 
 const links = [
@@ -15,11 +16,8 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/" className="group">
-          <p className="text-[10px] uppercase tracking-[0.45em] text-amber-300">VEEZO</p>
-          <p className="text-lg font-semibold tracking-[0.25em] text-white group-hover:text-amber-100">LUXURY FASHION</p>
-        </Link>
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <Logo variant="header" />
 
         <nav className="hidden items-center gap-6 md:flex">
           {links.map((link) => (

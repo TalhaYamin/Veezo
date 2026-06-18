@@ -5,6 +5,7 @@ import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import { apiRequest } from '../lib/api';
+import { imageUrl } from '../lib/images';
 import type { Collection } from '../types';
 
 export default function CollectionsPage() {
@@ -37,14 +38,27 @@ export default function CollectionsPage() {
               <Link
                 key={collection.id}
                 to={`/collections/${collection.slug}`}
-                className="rounded-[28px] border border-white/10 bg-white/5 p-6 transition hover:border-amber-400/30"
+                className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5 hover:border-amber-400/30"
               >
-                <p className="text-[11px] uppercase tracking-[0.35em] text-amber-200">
-                  {collection.category?.name || 'Collection'}
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">{collection.name}</h2>
-                <p className="mt-3 text-sm text-zinc-400">{collection.description || 'Shop the edit'}</p>
-                <p className="mt-5 text-xs text-zinc-500">{collection.productCount || 0} products</p>
+                {collection.image ? (
+                  <img
+                    src={imageUrl(collection.image)}
+                    alt={collection.name}
+                    className="aspect-[16/10] w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-[16/10] items-center justify-center bg-zinc-900 text-xs uppercase tracking-[0.35em] text-zinc-500">
+                    {collection.name}
+                  </div>
+                )}
+                <div className="p-6">
+                  <p className="text-[11px] uppercase tracking-[0.35em] text-amber-200">
+                    {collection.category?.name || 'Collection'}
+                  </p>
+                  <h2 className="mt-3 text-2xl font-semibold text-white">{collection.name}</h2>
+                  <p className="mt-3 text-sm text-zinc-400">{collection.description || 'Shop the edit'}</p>
+                  <p className="mt-5 text-xs text-zinc-500">{collection.productCount || 0} products</p>
+                </div>
               </Link>
             ))}
           </section>

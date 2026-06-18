@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import ProductCard from '../components/ProductCard';
+import ProductListingLayout from '../components/ProductListingLayout';
 import LoadingState from '../components/LoadingState';
-import EmptyState from '../components/EmptyState';
 import { apiRequest } from '../lib/api';
+import { defaultFilters, filterAndSortProducts } from '../lib/productFilters';
 import type { Category, Collection, Product } from '../types';
 
 export default function ShopPage() {
@@ -14,6 +14,7 @@ export default function ShopPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [filters, setFilters] = useState(defaultFilters);
 
   const categorySlug = searchParams.get('category') || '';
   const collectionSlug = searchParams.get('collection') || '';
@@ -46,6 +47,8 @@ export default function ShopPage() {
     [categories, categorySlug]
   );
 
+  const filteredProducts = useMemo(() => filterAndSortProducts(products, filters), [products, filters]);
+
   const updateFilter = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -62,13 +65,36 @@ export default function ShopPage() {
     setSearchParams(next);
   };
 
+  const collectionPills =
+    collections.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => updateFilter('collection', '')}
+          className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] ${!collectionSlug ? 'border border-amber-400 text-amber-200' : 'border border-white/10 text-zinc-400'}`}
+        >
+          All collections
+        </button>
+        {collections.map((collection) => (
+          <button
+            key={collection.id}
+            type="button"
+            onClick={() => updateFilter('collection', collection.slug)}
+            className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] ${collectionSlug === collection.slug ? 'border border-amber-400 text-amber-200' : 'border border-white/10 text-zinc-400'}`}
+          >
+            {collection.name}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   return (
     <Layout>
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <header className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
           <p className="text-xs uppercase tracking-[0.35em] text-amber-200">Shop</p>
           <h1 className="mt-3 text-3xl font-semibold text-white md:text-4xl">
-            {activeCategory ? activeCategory.name : 'All products'}
+            {activeCategory ? activeCategory.name : 'Shop Collection'}
           </h1>
           <p className="mt-3 max-w-2xl text-zinc-300">
             Discover luxury essentials with premium fabrics, polished silhouettes, and limited seasonal drops.
@@ -86,56 +112,18 @@ export default function ShopPage() {
           </form>
         </header>
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSearchParams({})}
-            className={`rounded-full px-4 py-2 text-sm ${!categorySlug && !collectionSlug ? 'bg-amber-400 text-black' : 'border border-white/10 text-zinc-300'}`}
-          >
-            All
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => updateFilter('category', category.slug)}
-              className={`rounded-full px-4 py-2 text-sm ${categorySlug === category.slug ? 'bg-amber-400 text-black' : 'border border-white/10 text-zinc-300'}`}
-            >
-              {category.name}
-            </button>
-          ))}
-        </div>
-
-        {collections.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {collections.map((collection) => (
-              <button
-                key={collection.id}
-                type="button"
-                onClick={() => updateFilter('collection', collection.slug)}
-                className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] ${collectionSlug === collection.slug ? 'border border-amber-400 text-amber-200' : 'border border-white/10 text-zinc-400'}`}
-              >
-                {collection.name}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <section className="mt-8">
           {loading ? (
             <LoadingState />
-          ) : products.length ? (
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
           ) : (
-            <EmptyState
-              title="No products found"
-              description="Try adjusting your filters or search terms."
-              actionLabel="View all products"
-              actionTo="/shop"
+            <ProductListingLayout
+              title={activeCategory ? activeCategory.name : 'All Products'}
+              subtitle={collectionPills ? undefined : 'Browse our full catalog'}
+              products={filteredProducts}
+              categories={categories}
+              filters={filters}
+              onFiltersChange={setFilters}
+              headerExtra={collectionPills}
             />
           )}
         </section>

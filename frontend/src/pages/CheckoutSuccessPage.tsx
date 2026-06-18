@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import LoadingState from '../components/LoadingState';
 import { apiRequest } from '../lib/api';
+import { formatPrice } from '../lib/currency';
 import { type OrderVerifyResponse } from '../lib/checkout';
 import { useCartStore } from '../store/cart';
 
@@ -73,9 +74,23 @@ export default function CheckoutSuccessPage() {
 
           {result?.order ? (
             <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-5 text-left">
-              <div className="flex justify-between text-sm text-zinc-300">
-                <span>Total due on delivery</span>
-                <span className="font-semibold text-amber-100">${result.order.total.toFixed(2)}</span>
+              <div className="space-y-2 text-sm text-zinc-300">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(result.order.subtotal ?? result.order.total)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery</span>
+                  <span>
+                    {(result.order.deliveryCharge ?? 0) === 0
+                      ? 'Free'
+                      : formatPrice(result.order.deliveryCharge ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-white/10 pt-2 font-semibold text-amber-100">
+                  <span>Total due on delivery</span>
+                  <span>{formatPrice(result.order.total)}</span>
+                </div>
               </div>
               {result.order.customerName ? (
                 <p className="mt-2 text-sm text-zinc-400">Deliver to: {result.order.customerName}</p>
@@ -94,7 +109,7 @@ export default function CheckoutSuccessPage() {
                   <li key={i} className="flex justify-between">
                     <span>{item.name}</span>
                     <span>
-                      {item.quantity} × ${item.price}
+                      {item.quantity} × {formatPrice(item.price)}
                     </span>
                   </li>
                 ))}

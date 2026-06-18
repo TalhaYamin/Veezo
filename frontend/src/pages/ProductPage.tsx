@@ -5,6 +5,7 @@ import ImageGallery from '../components/ImageGallery';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import { apiRequest } from '../lib/api';
+import { formatPrice } from '../lib/currency';
 import { useCartStore } from '../store/cart';
 import type { Product } from '../types';
 
@@ -68,8 +69,8 @@ export default function ProductPage() {
               </div>
               <p className="text-zinc-300">{product.description}</p>
               <div className="flex items-end gap-3">
-                <span className="text-3xl font-semibold text-amber-100">${product.price}</span>
-                {product.oldPrice ? <span className="text-sm text-zinc-500 line-through">${product.oldPrice}</span> : null}
+                <span className="text-3xl font-semibold text-amber-100">{formatPrice(product.price)}</span>
+                {product.oldPrice ? <span className="text-sm text-zinc-500 line-through">{formatPrice(product.oldPrice)}</span> : null}
               </div>
               <p className="text-sm text-zinc-400">{product.stock > 0 ? `${product.stock} in stock` : 'Sold out'}</p>
 

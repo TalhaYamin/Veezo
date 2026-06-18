@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { apiRequest } from '../../lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { apiFormRequest, apiRequest } from '../../lib/api';
+import { imageUrl, MAX_IMAGE_LABEL, validateImageFile } from '../../lib/images';
 import type { Category } from '../../types';
 
 type Props = {
@@ -15,8 +16,41 @@ export default function AdminCategories({ categories, onRefresh, onNotify, onErr
   const [categoryDescription, setCategoryDescription] = useState('');
   const [collectionName, setCollectionName] = useState('');
   const [collectionDescription, setCollectionDescription] = useState('');
+  const [collectionImageFile, setCollectionImageFile] = useState<File | null>(null);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) || categories[0];
+
+  const collectionImagePreview = useMemo(
+    () => (collectionImageFile ? URL.createObjectURL(collectionImageFile) : ''),
+    [collectionImageFile]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (collectionImagePreview) URL.revokeObjectURL(collectionImagePreview);
+    };
+  }, [collectionImagePreview]);
+
+  const resetCollectionForm = () => {
+    setCollectionName('');
+    setCollectionDescription('');
+    setCollectionImageFile(null);
+    setEditingCollectionId(null);
+  };
+
+  const handleCollectionImage = (file: File | null) => {
+    if (!file) {
+      setCollectionImageFile(null);
+      return;
+    }
+    const error = validateImageFile(file);
+    if (error) {
+      onError(error);
+      return;
+    }
+    setCollectionImageFile(file);
+  };
 
   const addCategory = async () => {
     if (!categoryName.trim()) return;
@@ -34,24 +68,36 @@ export default function AdminCategories({ categories, onRefresh, onNotify, onErr
     }
   };
 
-  const addCollection = async () => {
+  const saveCollection = async () => {
     if (!collectionName.trim() || !selectedCategory?.id) return;
+
+    const data = new FormData();
+    data.append('name', collectionName.trim());
+    data.append('description', collectionDescription.trim());
+    data.append('categoryId', selectedCategory.id);
+    if (collectionImageFile) data.append('imageFile', collectionImageFile);
+
     try {
-      await apiRequest('/admin/collections', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: collectionName.trim(),
-          description: collectionDescription.trim(),
-          categoryId: selectedCategory.id,
-        }),
-      });
-      setCollectionName('');
-      setCollectionDescription('');
+      if (editingCollectionId) {
+        await apiFormRequest(`/admin/collections/${editingCollectionId}`, data, 'PUT');
+        onNotify('Collection updated');
+      } else {
+        await apiFormRequest('/admin/collections', data, 'POST');
+        onNotify('Collection created');
+      }
+      resetCollectionForm();
       await onRefresh();
-      onNotify('Collection created');
     } catch (err: any) {
       onError(err.message);
     }
+  };
+
+  const editCollection = (collection: NonNullable<Category['collections']>[number]) => {
+    setEditingCollectionId(collection.id);
+    setCollectionName(collection.name);
+    setCollectionDescription(collection.description || '');
+    setCollectionImageFile(null);
+    setSelectedCategoryId(selectedCategory?.id || '');
   };
 
   const deleteCategory = async (id: string) => {
@@ -69,6 +115,7 @@ export default function AdminCategories({ categories, onRefresh, onNotify, onErr
     if (!window.confirm('Delete this collection and its products?')) return;
     try {
       await apiRequest(`/admin/collections/${id}`, { method: 'DELETE' });
+      if (editingCollectionId === id) resetCollectionForm();
       await onRefresh();
       onNotify('Collection deleted');
     } catch (err: any) {
@@ -101,19 +148,54 @@ export default function AdminCategories({ categories, onRefresh, onNotify, onErr
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-black/40 p-6">
-          <h4 className="font-semibold text-white">Collections {selectedCategory ? `in ${selectedCategory.name}` : ''}</h4>
+          <h4 className="font-semibold text-white">
+            {editingCollectionId ? 'Edit collection' : 'Collections'} {selectedCategory ? `in ${selectedCategory.name}` : ''}
+          </h4>
           <div className="mt-4 space-y-2">
             {selectedCategory?.collections?.map((collection) => (
-              <div key={collection.id} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm">
-                <span>{collection.name} ({collection.productCount || 0})</span>
-                <button type="button" onClick={() => deleteCollection(collection.id)} className="text-xs text-red-300">Delete</button>
+              <div key={collection.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2 text-sm">
+                <div className="flex items-center gap-3">
+                  {collection.image ? (
+                    <img src={imageUrl(collection.image)} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-[10px] text-zinc-500">No img</div>
+                  )}
+                  <span>{collection.name} ({collection.productCount || 0})</span>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => editCollection(collection)} className="text-xs text-amber-200">Edit</button>
+                  <button type="button" onClick={() => deleteCollection(collection.id)} className="text-xs text-red-300">Delete</button>
+                </div>
               </div>
             ))}
           </div>
           <div className="mt-4 space-y-2">
-            <input value={collectionName} onChange={(e) => setCollectionName(e.target.value)} placeholder="New collection" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
+            <input value={collectionName} onChange={(e) => setCollectionName(e.target.value)} placeholder="Collection name" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
             <input value={collectionDescription} onChange={(e) => setCollectionDescription(e.target.value)} placeholder="Description" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
-            <button type="button" onClick={addCollection} className="w-full rounded-full border border-amber-400/40 py-2 text-sm text-amber-100">Add collection</button>
+            <label className="block text-sm text-zinc-400">
+              Collection image (max {MAX_IMAGE_LABEL})
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleCollectionImage(e.target.files?.[0] || null)}
+                className="mt-2 w-full text-sm text-zinc-400"
+              />
+            </label>
+            {(collectionImagePreview || (editingCollectionId && selectedCategory?.collections?.find((c) => c.id === editingCollectionId)?.image)) ? (
+              <img
+                src={collectionImagePreview || imageUrl(selectedCategory?.collections?.find((c) => c.id === editingCollectionId)?.image)}
+                alt=""
+                className="h-24 w-24 rounded-lg object-cover"
+              />
+            ) : null}
+            <div className="flex gap-2">
+              <button type="button" onClick={saveCollection} className="flex-1 rounded-full border border-amber-400/40 py-2 text-sm text-amber-100">
+                {editingCollectionId ? 'Update collection' : 'Add collection'}
+              </button>
+              {editingCollectionId ? (
+                <button type="button" onClick={resetCollectionForm} className="rounded-full border border-white/10 px-4 py-2 text-sm">Cancel</button>
+              ) : null}
+            </div>
           </div>
         </section>
       </div>

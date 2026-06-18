@@ -29,6 +29,8 @@ export type InventoryAlert = {
 export type AdminOrder = {
   id: string;
   sessionId: string;
+  subtotal?: number;
+  deliveryCharge?: number;
   total: number;
   status: string;
   paymentMethod: string;

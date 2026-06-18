@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import EmptyState from '../components/EmptyState';
+import { formatPrice } from '../lib/currency';
+import { calculateDeliveryCharge, calculateOrderTotal } from '../lib/delivery';
+import { useStoreSettings } from '../hooks/useStoreSettings';
 import { useCartStore } from '../store/cart';
 import { imageUrl } from '../lib/images';
 
@@ -8,7 +11,11 @@ export default function CartPage() {
   const items = useCartStore((s) => s.items);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
-  const total = useCartStore((s) => s.total());
+  const subtotal = useCartStore((s) => s.total());
+  const { settings } = useStoreSettings();
+
+  const deliveryCharge = calculateDeliveryCharge(subtotal, settings);
+  const total = calculateOrderTotal(subtotal, settings);
 
   return (
     <Layout>
@@ -27,7 +34,7 @@ export default function CartPage() {
                   <div className="flex-1">
                     <h2 className="text-lg font-semibold text-white">{item.name}</h2>
                     <p className="mt-1 text-sm text-zinc-400">Size: {item.size}</p>
-                    <p className="mt-2 text-amber-100">${item.price}</p>
+                    <p className="mt-2 text-amber-100">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button type="button" onClick={() => updateQuantity(item.productId, item.size, item.quantity - 1)} className="rounded-full border border-white/10 px-3 py-1">−</button>
@@ -43,9 +50,26 @@ export default function CartPage() {
 
             <aside className="h-fit rounded-[28px] border border-white/10 bg-white/5 p-6">
               <h2 className="text-lg font-semibold text-white">Order summary</h2>
-              <div className="mt-4 flex items-center justify-between text-zinc-300">
-                <span>Subtotal</span>
-                <span className="text-amber-100">${total.toFixed(2)}</span>
+              <div className="mt-4 space-y-3 text-sm text-zinc-300">
+                <div className="flex items-center justify-between">
+                  <span>Subtotal</span>
+                  <span className="text-amber-100">{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Delivery</span>
+                  <span className="text-amber-100">
+                    {deliveryCharge === 0 ? 'Free' : formatPrice(deliveryCharge)}
+                  </span>
+                </div>
+                {settings.freeShippingThreshold > 0 && subtotal < settings.freeShippingThreshold ? (
+                  <p className="text-xs text-zinc-500">
+                    Free delivery on orders over {formatPrice(settings.freeShippingThreshold)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-lg text-white">
+                <span>Total</span>
+                <span className="text-amber-100">{formatPrice(total)}</span>
               </div>
               <Link to="/checkout" className="mt-6 block rounded-full bg-amber-400 px-5 py-3 text-center text-sm font-semibold text-black">
                 Proceed to checkout

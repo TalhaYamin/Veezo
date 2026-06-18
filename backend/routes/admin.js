@@ -8,7 +8,8 @@ const Inquiry = require('../models/Inquiry');
 const NewsletterSubscriber = require('../models/NewsletterSubscriber');
 const { requireAdmin, ADMIN_PASSWORD, ADMIN_TOKEN } = require('../middleware/auth');
 const { getSiteSettings, toPublicSettings } = require('../lib/settings');
-const { upload } = require('../middleware/upload');
+const { upload, uploadErrorMessage } = require('../middleware/upload');
+const { fileToDataUrl } = require('../lib/imageStorage');
 const { toProductJSON, toCategoryJSON, toCollectionJSON } = require('../utils/serialize');
 const { slugify } = require('../utils/slug');
 
@@ -22,7 +23,7 @@ function parseSizes(value) {
 
 function buildImagesFromUpload(files = [], existing = [], bodyImages = []) {
   const uploaded = files.map((file, index) => ({
-    url: `/uploads/${file.filename}`,
+    url: fileToDataUrl(file),
     alt: '',
     order: index,
     isPrimary: index === 0 && !existing.length,
@@ -53,6 +54,10 @@ function buildImagesFromUpload(files = [], existing = [], bodyImages = []) {
   return merged;
 }
 
+function imageFromUpload(file) {
+  return file ? fileToDataUrl(file) : null;
+}
+
 router.post('/login', (req, res) => {
   const { password } = req.body || {};
   if (password === ADMIN_PASSWORD) {
@@ -65,6 +70,8 @@ function toOrderJSON(order) {
   return {
     id: order.sessionId,
     sessionId: order.sessionId,
+    subtotal: order.subtotal ?? order.total,
+    deliveryCharge: order.deliveryCharge ?? 0,
     total: order.total,
     status: order.status,
     paymentMethod: order.paymentMethod,
@@ -220,7 +227,7 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/collections', requireAdmin, async (req, res) => {
+router.post('/collections', requireAdmin, upload.single('imageFile'), async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     const categoryId = req.body?.categoryId;
@@ -236,15 +243,19 @@ router.post('/collections', requireAdmin, async (req, res) => {
     const existing = await Collection.findOne({ categoryId, slug: slugify(name) });
     if (existing) return res.status(409).json({ message: 'Collection already exists in this category.' });
 
-    const collection = await Collection.create({ name, categoryId, description });
+    const image = imageFromUpload(req.file) || String(req.body?.image || '').trim();
+
+    const collection = await Collection.create({ name, categoryId, description, image });
     await collection.populate('categoryId');
     res.status(201).json(toCollectionJSON(collection));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    const message = uploadErrorMessage(error);
+    const status = error?.code === 'LIMIT_FILE_SIZE' || message.includes('300KB') ? 400 : 500;
+    res.status(status).json({ message });
   }
 });
 
-router.put('/collections/:id', requireAdmin, async (req, res) => {
+router.put('/collections/:id', requireAdmin, upload.single('imageFile'), async (req, res) => {
   try {
     const collection = await Collection.findById(req.params.id).populate('categoryId');
     if (!collection) return res.status(404).json({ message: 'Collection not found.' });
@@ -261,6 +272,8 @@ router.put('/collections/:id', requireAdmin, async (req, res) => {
     collection.name = name;
     collection.slug = slugify(name);
     collection.description = String(req.body?.description ?? collection.description);
+    if (req.file) collection.image = imageFromUpload(req.file);
+    else if (req.body?.image !== undefined) collection.image = String(req.body.image || '').trim();
     if (req.body?.order !== undefined) collection.order = Number(req.body.order);
     await collection.save();
 
@@ -271,7 +284,9 @@ router.put('/collections/:id', requireAdmin, async (req, res) => {
     await collection.populate('categoryId');
     res.json(toCollectionJSON(collection));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    const message = uploadErrorMessage(error);
+    const status = error?.code === 'LIMIT_FILE_SIZE' || message.includes('300KB') ? 400 : 500;
+    res.status(status).json({ message });
   }
 });
 
@@ -347,7 +362,9 @@ router.post('/products', requireAdmin, upload.array('imageFiles', 10), async (re
     await product.populate(['categoryId', 'collectionId']);
     res.status(201).json(toProductJSON(product));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    const message = uploadErrorMessage(error);
+    const status = error?.code === 'LIMIT_FILE_SIZE' || message.includes('300KB') || message.includes('image') ? 400 : 500;
+    res.status(status).json({ message });
   }
 });
 
@@ -373,9 +390,13 @@ router.put('/products/:id', requireAdmin, upload.array('imageFiles', 10), async 
       product.categoryId = collection.categoryId;
     }
 
-    const newImages = buildImagesFromUpload(req.files, product.images, req.body.images);
-    if (newImages.length) product.images = newImages;
-    else if (req.body.image) {
+    const newImages = buildImagesFromUpload(req.files, [], req.body.images);
+    if (req.body.images !== undefined || req.files?.length) {
+      if (!newImages.length) {
+        return res.status(400).json({ message: 'At least one product image is required.' });
+      }
+      product.images = newImages;
+    } else if (req.body.image) {
       product.images = [{ url: req.body.image, alt: product.name, order: 0, isPrimary: true }];
     }
 
@@ -383,7 +404,9 @@ router.put('/products/:id', requireAdmin, upload.array('imageFiles', 10), async 
     await product.populate(['categoryId', 'collectionId']);
     res.json(toProductJSON(product));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    const message = uploadErrorMessage(error);
+    const status = error?.code === 'LIMIT_FILE_SIZE' || message.includes('300KB') || message.includes('image') ? 400 : 500;
+    res.status(status).json({ message });
   }
 });
 
@@ -564,6 +587,10 @@ router.put('/settings/password', requireAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
+
+router.use((error, _req, res, _next) => {
+  res.status(400).json({ message: uploadErrorMessage(error) });
 });
 
 module.exports = router;

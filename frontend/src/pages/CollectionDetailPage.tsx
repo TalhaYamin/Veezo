@@ -1,17 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import ProductCard from '../components/ProductCard';
+import ProductListingLayout from '../components/ProductListingLayout';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import { apiRequest } from '../lib/api';
-import type { Collection } from '../types';
+import { defaultFilters, filterAndSortProducts } from '../lib/productFilters';
+import type { Category, Collection } from '../types';
 
 export default function CollectionDetailPage() {
   const { slug } = useParams();
   const [collection, setCollection] = useState<Collection | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState(defaultFilters);
+
+  useEffect(() => {
+    apiRequest<Category[]>('/categories').then(setCategories).catch(() => setCategories([]));
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -25,6 +32,9 @@ export default function CollectionDetailPage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  const products = collection?.products || [];
+  const filteredProducts = useMemo(() => filterAndSortProducts(products, filters), [products, filters]);
+
   return (
     <Layout>
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -36,7 +46,12 @@ export default function CollectionDetailPage() {
           <LoadingState />
         ) : error || !collection ? (
           <div className="mt-8">
-            <EmptyState title="Collection not found" description={error || 'This collection may have been removed.'} actionLabel="Browse collections" actionTo="/collections" />
+            <EmptyState
+              title="Collection not found"
+              description={error || 'This collection may have been removed.'}
+              actionLabel="Browse collections"
+              actionTo="/collections"
+            />
           </div>
         ) : (
           <>
@@ -46,17 +61,30 @@ export default function CollectionDetailPage() {
               <p className="mt-3 max-w-2xl text-zinc-300">{collection.description}</p>
             </header>
 
-            {collection.products?.length ? (
-              <section className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {collection.products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </section>
-            ) : (
-              <div className="mt-8">
-                <EmptyState title="No products in this collection" description="Products will appear here once added from the admin panel." actionLabel="Browse shop" actionTo="/shop" />
-              </div>
-            )}
+            <section className="mt-8">
+              {products.length ? (
+                <ProductListingLayout
+                  title={collection.name}
+                  subtitle={collection.description}
+                  products={filteredProducts}
+                  categories={categories}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  showCategories
+                  emptyTitle="No products match your filters"
+                  emptyDescription="Try adjusting the price range or sort order."
+                  emptyActionLabel="Browse shop"
+                  emptyActionTo="/shop"
+                />
+              ) : (
+                <EmptyState
+                  title="No products in this collection"
+                  description="Products will appear here once added from the admin panel."
+                  actionLabel="Browse shop"
+                  actionTo="/shop"
+                />
+              )}
+            </section>
           </>
         )}
       </main>

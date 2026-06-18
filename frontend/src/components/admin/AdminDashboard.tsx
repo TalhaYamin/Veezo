@@ -1,4 +1,5 @@
 import type { DashboardData } from '../../types/admin';
+import { formatPrice } from '../../lib/currency';
 
 const statusRows = [
   { key: 'inStock', label: 'In Stock', color: 'bg-emerald-500' },
@@ -27,7 +28,7 @@ export default function AdminDashboard({ data }: { data: DashboardData }) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ['Total Revenue', `$${data.totalRevenue.toFixed(2)}`, 'From orders'],
+          ['Total Revenue', formatPrice(data.totalRevenue), 'From orders'],
           ['Total Orders', String(data.totalOrders), 'All time'],
           ['Total Products', String(data.totalProducts), 'In catalog'],
           ['Subscribers', String(data.newsletterCount), 'Newsletter'],
@@ -101,7 +102,7 @@ export default function AdminDashboard({ data }: { data: DashboardData }) {
                   <td className="py-3 pr-4">#{order.id.slice(-8)}</td>
                   <td className="py-3 pr-4">{order.customerName || 'Guest'}</td>
                   <td className="py-3 pr-4">{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td className="py-3 pr-4 text-amber-100">${order.total.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-amber-100">{formatPrice(order.total)}</td>
                   <td className="py-3">
                     <span className={`rounded-full px-3 py-1 text-xs capitalize ${orderStatusClass(order.status)}`}>
                       {order.status}

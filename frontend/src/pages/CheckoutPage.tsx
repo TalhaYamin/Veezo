@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import EmptyState from '../components/EmptyState';
 import { apiRequest } from '../lib/api';
+import { formatPrice } from '../lib/currency';
+import { calculateDeliveryCharge, calculateOrderTotal } from '../lib/delivery';
+import { useStoreSettings } from '../hooks/useStoreSettings';
 import { type PlaceOrderResponse } from '../lib/checkout';
 import { useCartStore } from '../store/cart';
 
@@ -12,8 +15,12 @@ const inputClass =
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const items = useCartStore((s) => s.items);
-  const total = useCartStore((s) => s.total());
+  const subtotal = useCartStore((s) => s.total());
   const clearCart = useCartStore((s) => s.clearCart);
+  const { settings } = useStoreSettings();
+
+  const deliveryCharge = calculateDeliveryCharge(subtotal, settings);
+  const total = calculateOrderTotal(subtotal, settings);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -98,7 +105,7 @@ export default function CheckoutPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className={inputClass}
-                    placeholder="+1 555 000 0000"
+                    placeholder="+92 300 0000000"
                   />
                 </label>
 
@@ -136,7 +143,7 @@ export default function CheckoutPage() {
                       {item.name} · {item.size}
                     </span>
                     <span>
-                      {item.quantity} × ${item.price}
+                      {item.quantity} × {formatPrice(item.price)}
                     </span>
                   </li>
                 ))}
@@ -153,9 +160,25 @@ export default function CheckoutPage() {
                 </p>
               </div>
 
-              <div className="mt-5 flex items-center justify-between text-lg text-amber-100">
+              <div className="mt-5 space-y-3 text-sm text-zinc-300">
+                <div className="flex items-center justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Delivery</span>
+                  <span>{deliveryCharge === 0 ? 'Free' : formatPrice(deliveryCharge)}</span>
+                </div>
+                {settings.freeShippingThreshold > 0 && subtotal < settings.freeShippingThreshold ? (
+                  <p className="text-xs text-zinc-500">
+                    Free delivery on orders over {formatPrice(settings.freeShippingThreshold)}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-lg text-amber-100">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatPrice(total)}</span>
               </div>
 
               <button

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../../lib/api';
+import { formatPrice } from '../../lib/currency';
 import type {
   AdminCustomer,
   AdminInquiry,
@@ -67,7 +68,7 @@ export function AdminOrdersPanel({ onError, onNotify }: { onError: (m: string) =
                 <td className="py-3 pr-4">#{order.id.slice(-8)}</td>
                 <td className="py-3 pr-4">{order.customerName || 'Guest'}</td>
                 <td className="py-3 pr-4">{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td className="py-3 pr-4 text-amber-100">${order.total.toFixed(2)}</td>
+                <td className="py-3 pr-4 text-amber-100">{formatPrice(order.total)}</td>
                 <td className="py-3 pr-4">
                   <span className={`rounded-full px-3 py-1 text-xs capitalize ${statusClass(order.status)}`}>{order.status}</span>
                 </td>
@@ -111,9 +112,28 @@ export function AdminOrdersPanel({ onError, onNotify }: { onError: (m: string) =
             {selected.items.map((item, i) => (
               <li key={i} className="flex justify-between text-zinc-300">
                 <span>{item.name} × {item.quantity}</span>
-                <span>${(item.price * item.quantity).toFixed(2)}</span>
+                <span>{formatPrice(item.price * item.quantity)}</span>
               </li>
             ))}
+            <li className="flex justify-between border-t border-white/10 pt-2 text-zinc-400">
+              <span>Subtotal</span>
+              <span>{formatPrice(selected.subtotal ?? selected.total)}</span>
+            </li>
+            {(selected.deliveryCharge ?? 0) > 0 ? (
+              <li className="flex justify-between text-zinc-400">
+                <span>Delivery</span>
+                <span>{formatPrice(selected.deliveryCharge ?? 0)}</span>
+              </li>
+            ) : (
+              <li className="flex justify-between text-zinc-400">
+                <span>Delivery</span>
+                <span>Free</span>
+              </li>
+            )}
+            <li className="flex justify-between font-medium text-amber-100">
+              <span>Total</span>
+              <span>{formatPrice(selected.total)}</span>
+            </li>
           </ul>
         </div>
       ) : null}
@@ -147,7 +167,7 @@ export function AdminCustomersPanel({ onError }: { onError: (m: string) => void 
                 <td className="py-3 pr-4">{c.email || '—'}</td>
                 <td className="py-3 pr-4">{c.phone || '—'}</td>
                 <td className="py-3 pr-4">{c.orders}</td>
-                <td className="py-3 text-amber-100">${c.totalSpent.toFixed(2)}</td>
+                <td className="py-3 text-amber-100">{formatPrice(c.totalSpent)}</td>
               </tr>
             ))}
             {!customers.length ? <tr><td colSpan={5} className="py-8 text-center text-zinc-500">No customers yet</td></tr> : null}
@@ -337,10 +357,38 @@ export function AdminSettingsPanel({ onError, onNotify }: { onError: (m: string)
     <div className="space-y-8">
       <h3 className="text-2xl font-semibold text-amber-100">Settings</h3>
       <section className="rounded-2xl border border-white/10 bg-black/40 p-6 space-y-4">
+        <h4 className="font-semibold text-white">Delivery charges</h4>
+        <p className="text-sm text-zinc-400">
+          Set how much customers pay for delivery. Orders at or above the free delivery threshold ship at no extra cost.
+        </p>
+        <label className="block text-sm text-zinc-400">
+          Delivery charge (PKR)
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={settings.shippingCost}
+            onChange={(e) => setSettings({ ...settings, shippingCost: Number(e.target.value) })}
+            className={inputClass}
+            placeholder="e.g. 250"
+          />
+        </label>
+        <label className="block text-sm text-zinc-400">
+          Free delivery on orders over (PKR)
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={settings.freeShippingThreshold}
+            onChange={(e) => setSettings({ ...settings, freeShippingThreshold: Number(e.target.value) })}
+            className={inputClass}
+            placeholder="e.g. 5000 — set 0 to always charge delivery"
+          />
+        </label>
+      </section>
+      <section className="rounded-2xl border border-white/10 bg-black/40 p-6 space-y-4">
         <h4 className="font-semibold text-white">Store settings</h4>
         <input value={settings.storeName} onChange={(e) => setSettings({ ...settings, storeName: e.target.value })} className={inputClass} placeholder="Store name" />
-        <input type="number" value={settings.shippingCost} onChange={(e) => setSettings({ ...settings, shippingCost: Number(e.target.value) })} className={inputClass} placeholder="Shipping cost" />
-        <input type="number" value={settings.freeShippingThreshold} onChange={(e) => setSettings({ ...settings, freeShippingThreshold: Number(e.target.value) })} className={inputClass} placeholder="Free shipping threshold" />
         <input value={settings.whatsappNumber} onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })} className={inputClass} placeholder="WhatsApp number / link" />
         <button type="button" onClick={saveSettings} className="rounded-full bg-amber-400 px-6 py-2 text-sm font-semibold text-black">Save settings</button>
       </section>
